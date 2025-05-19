@@ -1,33 +1,50 @@
-import { createBrowserSupabaseClient } from "@supabase/auth-helpers-nextjs"
-import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
-import { createServerActionClient } from "@supabase/auth-helpers-nextjs"
 import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs"
-import { cookies, headers } from "next/headers"
+import { NextResponse } from "next/server"
+import type { NextRequest } from "next/server"
 
-import type { Database } from "@/types/supabase" // se você estiver usando types gerados pelo Supabase
+export async function middleware(req: NextRequest) {
+  // Ignorar rotas públicas e arquivos estáticos
+  if (
+    req.nextUrl.pathname.startsWith("/_next") ||
+    req.nextUrl.pathname.startsWith("/api") ||
+    req.nextUrl.pathname.startsWith("/static") ||
+    req.nextUrl.pathname.includes(".") ||
+    req.nextUrl.pathname === "/debug" ||
+    req.nextUrl.pathname === "/api/debug"
+  ) {
+    return NextResponse.next()
+  }
 
-// CLIENT: usado em componentes client-side (useEffect, eventos de botão, etc)
-export const createClientSupabaseClient = () => {
-  return createBrowserSupabaseClient<Database>()
+  // Ignorar rotas de autenticação
+  if (req.nextUrl.pathname === "/auth/callback" || req.nextUrl.pathname.startsWith("/auth/")) {
+    return NextResponse.next()
+  }
+
+  const res = NextResponse.next()
+  const supabase = createMiddlewareClient({ req, res })
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  const isAccessingProtectedRoute = req.nextUrl.pathname.startsWith("/dashboard")
+  const isAccessingLoginPage = req.nextUrl.pathname === "/"
+
+  if (!session && isAccessingProtectedRoute) {
+    console.log("Middleware SSR: Usuário não autenticado, redirecionando para login")
+    return NextResponse.redirect(new URL("/", req.url))
+  }
+
+  if (session && isAccessingLoginPage) {
+    console.log("Middleware SSR: Usuário já autenticado, redirecionando para dashboard")
+    return NextResponse.redirect(new URL("/dashboard", req.url))
+  }
+
+  return res
 }
 
-// SERVER COMPONENT: usado em arquivos server-side como layout.tsx, page.tsx
-export const createServerSupabaseClient = () => {
-  return createServerComponentClient<Database>({
-    cookies,
-    headers,
-  })
-}
-
-// SERVER ACTION: usado em server actions ou actions no form do Next.js
-export const createActionSupabaseClient = () => {
-  return createServerActionClient<Database>({
-    cookies,
-    headers,
-  })
-}
-
-// MIDDLEWARE: usado dentro de middleware.ts
-export const createMiddlewareSupabaseClient = (ctx: { req: any; res: any }) => {
-  return createMiddlewareClient<Database>(ctx)
+export const config = {
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|logo.svg|images|.*\\..*$).*)",
+  ],
 }
