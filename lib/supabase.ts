@@ -1,32 +1,33 @@
-// lib/supabase.ts
+import { createBrowserSupabaseClient } from "@supabase/auth-helpers-nextjs"
+import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
+import { createServerActionClient } from "@supabase/auth-helpers-nextjs"
+import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs"
+import { cookies, headers } from "next/headers"
 
-import { createClient } from "@supabase/supabase-js"
-import { supabaseConfig } from "./supabase-config"
+import type { Database } from "@/types/supabase" // se você estiver usando types gerados pelo Supabase
 
-// ✅ Cliente para SSR/API/Middleware (server-side)
+// CLIENT: usado em componentes client-side (useEffect, eventos de botão, etc)
+export const createClientSupabaseClient = () => {
+  return createBrowserSupabaseClient<Database>()
+}
+
+// SERVER COMPONENT: usado em arquivos server-side como layout.tsx, page.tsx
 export const createServerSupabaseClient = () => {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY! // Atenção: essa chave deve ser usada apenas no server
-
-  return createClient(supabaseUrl, supabaseKey, {
-    auth: {
-      persistSession: false,
-    },
+  return createServerComponentClient<Database>({
+    cookies,
+    headers,
   })
 }
 
-// ✅ Singleton para o cliente do lado do cliente (browser)
-let clientSupabaseInstance: ReturnType<typeof createClient> | null = null
-
-export const createClientSupabaseClient = () => {
-  if (clientSupabaseInstance) return clientSupabaseInstance
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-
-  clientSupabaseInstance = createClient(supabaseUrl, supabaseAnonKey, supabaseConfig)
-  return clientSupabaseInstance
+// SERVER ACTION: usado em server actions ou actions no form do Next.js
+export const createActionSupabaseClient = () => {
+  return createServerActionClient<Database>({
+    cookies,
+    headers,
+  })
 }
 
-// ✅ Alias compatível com o Supabase Auth Helpers
-export const createClientComponentClient = createClientSupabaseClient
+// MIDDLEWARE: usado dentro de middleware.ts
+export const createMiddlewareSupabaseClient = (ctx: { req: any; res: any }) => {
+  return createMiddlewareClient<Database>(ctx)
+}
