@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js"
+import { createClient } from "@supabase/auth-helpers-nextjs"
 import { supabaseConfig } from "./supabase-config"
 
 // Criando cliente para o lado do servidor
