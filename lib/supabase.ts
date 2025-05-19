@@ -1,50 +1,29 @@
-import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs"
-import { NextResponse } from "next/server"
-import type { NextRequest } from "next/server"
+import { createClient } from "@supabase/supabase-js"
+import { supabaseConfig } from "./supabase-config"
 
-export async function middleware(req: NextRequest) {
-  // Ignorar rotas públicas e arquivos estáticos
-  if (
-    req.nextUrl.pathname.startsWith("/_next") ||
-    req.nextUrl.pathname.startsWith("/api") ||
-    req.nextUrl.pathname.startsWith("/static") ||
-    req.nextUrl.pathname.includes(".") ||
-    req.nextUrl.pathname === "/debug" ||
-    req.nextUrl.pathname === "/api/debug"
-  ) {
-    return NextResponse.next()
-  }
-
-  // Ignorar rotas de autenticação
-  if (req.nextUrl.pathname === "/auth/callback" || req.nextUrl.pathname.startsWith("/auth/")) {
-    return NextResponse.next()
-  }
-
-  const res = NextResponse.next()
-  const supabase = createMiddlewareClient({ req, res })
-
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-
-  const isAccessingProtectedRoute = req.nextUrl.pathname.startsWith("/dashboard")
-  const isAccessingLoginPage = req.nextUrl.pathname === "/"
-
-  if (!session && isAccessingProtectedRoute) {
-    console.log("Middleware SSR: Usuário não autenticado, redirecionando para login")
-    return NextResponse.redirect(new URL("/", req.url))
-  }
-
-  if (session && isAccessingLoginPage) {
-    console.log("Middleware SSR: Usuário já autenticado, redirecionando para dashboard")
-    return NextResponse.redirect(new URL("/dashboard", req.url))
-  }
-
-  return res
+// Criando cliente para o lado do servidor
+export const createServerSupabaseClient = () => {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+  return createClient(supabaseUrl, supabaseKey, {
+    auth: {
+      persistSession: false,
+    },
+  })
 }
 
-export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|logo.svg|images|.*\\..*$).*)",
-  ],
+// Singleton para o cliente do lado do cliente
+let clientSupabaseInstance: ReturnType<typeof createClient> | null = null
+
+export const createClientSupabaseClient = () => {
+  if (clientSupabaseInstance) return clientSupabaseInstance
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+  clientSupabaseInstance = createClient(supabaseUrl, supabaseAnonKey, supabaseConfig)
+  return clientSupabaseInstance
 }
+
+// Alias para compatibilidade com código existente
+export const createClientComponentClient = createClientSupabaseClient
